@@ -16,7 +16,7 @@ jobs:
 
     env:
       GH_TOKEN: ${{ secrets.PROJECT_READ_TOKEN }}
-      PROJECT_OWNER: sherokiddo
+      PROJECT_OWNER: "@me"
       PROJECT_NUMBER: "3"
 
     steps:
