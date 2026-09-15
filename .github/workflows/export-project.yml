@@ -3,7 +3,6 @@ name: Export GitHub Project
 on:
   workflow_dispatch:
 
-  # Автоматически обновлять снимок раз в час
   schedule:
     - cron: "17 * * * *"
 
@@ -23,7 +22,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Export project
+      - name: Export project snapshot
         shell: bash
         run: |
           set -euo pipefail
@@ -44,28 +43,16 @@ jobs:
             > project-snapshot/fields.json
 
           echo "Exporting project items..."
-
-          args=(
-            project item-list "$PROJECT_NUMBER"
-            --owner "$PROJECT_OWNER"
-            --limit 1000
-            --format json
-          )
-
-          # Автоматически добавляем все пользовательские поля проекта:
-          # Status, Priority, Iteration, Size, Area, Blocked и любые будущие.
-          while IFS= read -r field; do
-            if [ -n "$field" ]; then
-              args+=(--field "$field")
-            fi
-          done < <(
-            jq -r '.fields[]?.name // empty' \
-              project-snapshot/fields.json
-          )
-
-          gh "${args[@]}" > project-snapshot/items.json
+          gh project item-list "$PROJECT_NUMBER" \
+            --owner "$PROJECT_OWNER" \
+            --limit 1000 \
+            --format json \
+            > project-snapshot/items.json
 
           echo "Export finished."
+
+          echo "Snapshot contents:"
+          ls -lah project-snapshot/
 
       - name: Commit updated snapshot
         shell: bash
@@ -75,7 +62,7 @@ jobs:
           git add project-snapshot/
 
           if git diff --cached --quiet; then
-            echo "Project has not changed."
+            echo "Project snapshot has not changed."
             exit 0
           fi
 
