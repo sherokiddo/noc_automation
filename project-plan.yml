@@ -1,0 +1,98 @@
+project:
+  owner: sherokiddo
+  number: 3
+
+defaults:
+  repository: sherokiddo/project_py_scheduler
+
+tasks:
+
+  - issue: 22
+    status: Backlog
+    priority:
+    size:
+    area:
+    blocked: No
+    assignees: []
+
+  - issue: 23
+    status: Backlog
+    priority:
+    size:
+    area:
+    blocked: No
+    assignees: []
+
+  - issue: 24
+    status: Backlog
+    priority:
+    size:
+    area:
+    blocked: No
+    assignees: []
+
+  - issue: 25
+    status: Backlog
+    priority:
+    size:
+    area:
+    blocked: No
+    assignees: []
+
+  - issue: 27
+    status: Backlog
+    priority:
+    size:
+    area:
+    blocked: No
+    assignees: []
+
+  - issue: 28
+    status: Backlog
+    priority:
+    size:
+    area:
+    blocked: No
+    assignees: []
+
+  - issue: 29
+    status: Backlog
+    priority:
+    size:
+    area:
+    blocked: No
+    assignees: []
+
+  - issue: 30
+    status: Backlog
+    priority:
+    size:
+    area:
+    blocked: No
+    assignees:
+      - She1byyyy
+
+  - issue: 31
+    status: Backlog
+    priority:
+    size:
+    area:
+    blocked: No
+    assignees:
+      - IvanNoritsin
+
+  - issue: 35
+    status: Backlog
+    priority:
+    size:
+    area:
+    blocked: No
+    assignees: []
+
+  - issue: 36
+    status: Backlog
+    priority:
+    size:
+    area:
+    blocked: No
+    assignees: []
