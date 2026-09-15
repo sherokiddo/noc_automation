@@ -1,0 +1,187 @@
+name: Apply GitHub Project Plan
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Только показать изменения, ничего не записывать"
+        required: true
+        type: boolean
+        default: true
+
+      only_issue:
+        description: "Номер одной Issue для теста. Пусто = обработать весь plan"
+        required: false
+        type: string
+        default: ""
+
+permissions:
+  contents: read
+
+jobs:
+  apply-project-plan:
+    runs-on: ubuntu-latest
+
+    env:
+      GH_TOKEN: ${{ secrets.PROJECT_WRITE_TOKEN }}
+
+      # Используем @me, потому что именно этот вариант
+      # уже корректно заработал с твоим user-level Project.
+      PROJECT_OWNER: "@me"
+
+      DRY_RUN: ${{ inputs.dry_run }}
+      ONLY_ISSUE: ${{ inputs.only_issue }}
+
+    steps:
+      - name: Checkout noc_automation
+        uses: actions/checkout@v6
+
+      - name: Install YAML parser
+        run: |
+          python -m pip install --quiet pyyaml
+
+      - name: Read project configuration
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          python <<'PY'
+          import os
+          import yaml
+
+          with open("project-plan.yml", "r", encoding="utf-8") as f:
+              plan = yaml.safe_load(f)
+
+          project_number = str(plan["project"]["number"])
+          default_repo = plan.get("defaults", {}).get("repository", "")
+
+          with open(os.environ["GITHUB_ENV"], "a", encoding="utf-8") as env:
+              env.write(f"PROJECT_NUMBER={project_number}\n")
+              env.write(f"DEFAULT_REPO={default_repo}\n")
+
+          print(f"Project number: {project_number}")
+          print(f"Default repository: {default_repo}")
+          PY
+
+      - name: Check Project access
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          echo "Checking access to GitHub Project..."
+
+          gh project view "$PROJECT_NUMBER" \
+            --owner "$PROJECT_OWNER" \
+            --format json > /dev/null
+
+          echo "Project access OK."
+
+      - name: Prepare task list
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          python <<'PY' > /tmp/project-tasks.ndjson
+          import json
+          import yaml
+
+          with open("project-plan.yml", "r", encoding="utf-8") as f:
+              plan = yaml.safe_load(f)
+
+          for task in plan.get("tasks", []):
+              print(json.dumps(task, ensure_ascii=False))
+          PY
+
+          echo "Tasks loaded:"
+          wc -l /tmp/project-tasks.ndjson
+
+      - name: Apply plan
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          apply_field() {
+            local issue_url="$1"
+            local task_json="$2"
+            local field_name="$3"
+            local yaml_key="$4"
+
+            local value
+            value="$(jq -r --arg key "$yaml_key" '.[$key] // empty' <<< "$task_json")"
+
+            if [ -z "$value" ] || [ "$value" = "null" ]; then
+              return
+            fi
+
+            if [ "$DRY_RUN" = "true" ]; then
+              echo "  [DRY RUN] $field_name -> $value"
+            else
+              echo "  Updating $field_name -> $value"
+
+              gh project item-edit "$PROJECT_NUMBER" \
+                --owner "$PROJECT_OWNER" \
+                --url "$issue_url" \
+                --field "$field_name" \
+                --value "$value"
+            fi
+          }
+
+          while IFS= read -r task; do
+
+            issue="$(jq -r '.issue' <<< "$task")"
+
+            if [ -n "$ONLY_ISSUE" ] && [ "$issue" != "$ONLY_ISSUE" ]; then
+              continue
+            fi
+
+            repo="$(jq -r '.repository // empty' <<< "$task")"
+
+            if [ -z "$repo" ] || [ "$repo" = "null" ]; then
+              repo="$DEFAULT_REPO"
+            fi
+
+            if [ -z "$repo" ]; then
+              echo "ERROR: repository is not defined for issue #$issue"
+              exit 1
+            fi
+
+            issue_url="https://github.com/$repo/issues/$issue"
+
+            echo ""
+            echo "=========================================="
+            echo "Issue #$issue"
+            echo "$issue_url"
+            echo "=========================================="
+
+            apply_field "$issue_url" "$task" "Status"   "status"
+            apply_field "$issue_url" "$task" "Priority" "priority"
+            apply_field "$issue_url" "$task" "Size"     "size"
+            apply_field "$issue_url" "$task" "Area"     "area"
+            apply_field "$issue_url" "$task" "Blocked"  "blocked"
+
+            while IFS= read -r assignee; do
+
+              if [ -z "$assignee" ]; then
+                continue
+              fi
+
+              if [ "$DRY_RUN" = "true" ]; then
+                echo "  [DRY RUN] Assignee -> $assignee"
+              else
+                echo "  Adding assignee -> $assignee"
+
+                gh issue edit "$issue" \
+                  --repo "$repo" \
+                  --add-assignee "$assignee"
+              fi
+
+            done < <(jq -r '.assignees[]? // empty' <<< "$task")
+
+          done < /tmp/project-tasks.ndjson
+
+          echo ""
+          if [ "$DRY_RUN" = "true" ]; then
+            echo "DRY RUN completed. No GitHub data was changed."
+          else
+            echo "Project plan successfully applied."
+          fi
