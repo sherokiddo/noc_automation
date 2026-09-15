@@ -15,7 +15,7 @@ jobs:
     runs-on: ubuntu-latest
 
     env:
-      GH_TOKEN: ${{ secrets.PROJECT_TOKEN }}
+      GH_TOKEN: ${{ secrets.PROJECT_READ_TOKEN }}
       PROJECT_OWNER: sherokiddo
       PROJECT_NUMBER: "3"
 
