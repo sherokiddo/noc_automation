@@ -12,7 +12,7 @@ tasks:
     priority:
     size:
     area:
-    blocked: No
+    blocked: "No"
     assignees: []
 
   - issue: 23
